@@ -145,6 +145,28 @@ tr:hover td{background:#f8fafc}
 .item-selector-list .item-row .stock{font-size:.8rem;color:var(--gray)}
 .voucher-items-table .qty-input{width:70px;padding:4px 6px;text-align:center}
 .voucher-items-table .rate-input{width:80px;padding:4px 6px;text-align:right}
+/* LOGIN SCREEN */
+.login-screen{position:fixed;inset:0;background:linear-gradient(135deg,#0f2a44 0%,#1a3a5c 50%,#2a5a8c 100%);z-index:99998;display:flex;align-items:center;justify-content:center;padding:20px}
+.login-box{background:#fff;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.4);padding:40px 35px;max-width:400px;width:100%;text-align:center}
+.login-box .login-logo{font-size:2.5rem;margin-bottom:10px}
+.login-box h1{font-size:1.6rem;font-weight:700;color:#0f2a44;margin-bottom:4px}
+.login-box h1 span{color:#e67e22}
+.login-box .login-sub{color:#95a5a6;font-size:.9rem;margin-bottom:24px}
+.login-box .form-group{margin-bottom:14px;text-align:left}
+.login-box label{display:block;font-weight:600;font-size:.85rem;color:#2c3e50;margin-bottom:6px}
+.login-box input{width:100%;padding:12px 14px;border:2px solid #e9ecef;border-radius:8px;font-size:1rem;transition:border .2s}
+.login-box input:focus{border-color:#2a5a8c;box-shadow:0 0 0 3px rgba(42,90,140,.15)}
+.login-box button{width:100%;padding:13px;background:#2a5a8c;color:#fff;border:none;border-radius:8px;font-size:1rem;font-weight:700;cursor:pointer;transition:all .2s;margin-top:6px}
+.login-box button:hover{background:#1a3a5c;transform:translateY(-1px)}
+.login-box button:disabled{opacity:.6;cursor:not-allowed}
+.login-error{color:#e74c3c;font-size:.85rem;margin-top:12px;min-height:20px;font-weight:500}
+.login-footer{margin-top:20px;font-size:.75rem;color:#95a5a6}
+.user-menu{display:flex;align-items:center;gap:8px;padding:6px 12px;background:rgba(42,90,140,.08);border-radius:20px;font-size:.8rem;font-weight:600;color:#1a3a5c}
+.user-menu .user-email{max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.user-menu .logout-btn{background:none;color:#e74c3c;font-weight:700;cursor:pointer;padding:2px 6px;border-radius:4px;font-size:.9rem}
+.user-menu .logout-btn:hover{background:rgba(231,76,60,.1)}
+@media (max-width:480px){.login-box{padding:30px 22px}.login-box h1{font-size:1.4rem}.user-menu .user-email{max-width:80px}}
+/* LOADING */
 .loading-overlay{position:fixed;inset:0;background:rgba(255,255,255,.85);z-index:99999;display:none;align-items:center;justify-content:center;flex-direction:column;gap:16px}
 .loading-overlay.show{display:flex}
 .loading-spinner{width:48px;height:48px;border:4px solid #e9ecef;border-top-color:var(--primary-light);border-radius:50%;animation:spin .8s linear infinite}
@@ -152,6 +174,28 @@ tr:hover td{background:#f8fafc}
 </style>
 </head>
 <body>
+
+<!-- LOGIN SCREEN -->
+<div class="login-screen" id="loginScreen" style="display:none">
+  <div class="login-box">
+    <div class="login-logo">⚡</div>
+    <h1><span>Electra</span>ERP</h1>
+    <p class="login-sub">Sign in to your account</p>
+    <form id="loginForm" onsubmit="handleLogin(event)">
+      <div class="form-group">
+        <label>Email Address</label>
+        <input type="email" id="loginEmail" placeholder="admin@electraerp.com" required autocomplete="email" />
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="loginPassword" placeholder="••••••••" required autocomplete="current-password" />
+      </div>
+      <button type="submit" id="loginBtn">🔐 Sign In</button>
+      <div class="login-error" id="loginError"></div>
+    </form>
+    <div class="login-footer">v4.2 &bull; Secured by Supabase</div>
+  </div>
+</div>
 
 <div class="loading-overlay" id="loadingOverlay">
 <div class="loading-spinner"></div>
@@ -172,7 +216,7 @@ tr:hover td{background:#f8fafc}
 <a href="#" data-page="backup"><span class="icon">💾</span> Backup / Restore</a>
 <a href="#" data-page="settings"><span class="icon">⚙️</span> Settings</a>
 </nav>
-<div class="sidebar-footer">v4.1 &bull; Supabase Cloud</div>
+<div class="sidebar-footer">v4.2 &bull; Supabase Cloud</div>
 </aside>
 
 <div class="main-content" id="mainContent">
@@ -184,6 +228,11 @@ tr:hover td{background:#f8fafc}
 <div class="topbar-actions">
 <button class="btn btn-outline btn-sm" onclick="refreshAll()">🔄 Refresh</button>
 <button class="btn btn-primary btn-sm" onclick="navigateTo('issue')">➕ New Issue</button>
+<div class="user-menu" id="userMenu" style="display:none">
+<span>👤</span>
+<span class="user-email" id="userEmail">-</span>
+<button class="logout-btn" onclick="handleLogout()" title="Logout">🚪</button>
+</div>
 </div>
 </div>
 
@@ -520,9 +569,6 @@ function formatCurrency(n){const s=getSettings();return s.currency+' '+Number(n|
 function getToday(){return new Date().toISOString().split('T')[0]}
 function getNow(){return new Date().toTimeString().slice(0,5)}
 
-// ============================================================
-// ID GENERATORS (FIX: peek vs commit)
-// ============================================================
 async function peekId(prefix){
   const {data,error} = await sb.rpc('peek_counter', {p_prefix: prefix});
   if(error){console.warn('peekId fallback:',error.message);return prefix+'00001'}
@@ -722,7 +768,6 @@ async function saveItem(){
   const{error}=await sb.from('items').insert([{id:code,name,category:category||'General',specification:spec||'Standard',unit,rate,min_stock:minStock,current_stock:openingStock,status:'active'}]);
   showLoading(false);
   if(error){toast('Error: '+error.message,'error');return}
-  // Increment counter for EL-
   await sb.rpc('next_counter',{p_prefix:'EL-'});
   CACHE.items.push({id:code,name,category:category||'General',specification:spec||'Standard',unit,rate,minStock,currentStock:openingStock,status:'active'});
   closeModal();renderItems();toast('Item '+code+' added successfully');
@@ -879,7 +924,6 @@ function updateReceiptTotals(){
 async function saveReceipt(){
   if(receiptItems.length===0){toast('Add at least one item','error');return}
   for(const it of receiptItems){if(it.receiveQty<=0){toast('Quantity must be > 0 for '+it.itemName,'error');return}}
-  // FIX: reserve number only on save
   let receiptNo=document.getElementById('receiptVoucherNo').textContent;
   if(document.getElementById('receiptVoucherNo').dataset.reserved!=='true'){
     receiptNo=await genId('GRN-');
@@ -1128,7 +1172,6 @@ async function saveIssueVoucher(){
     if(it.issueQty<=0){toast('Quantity must be > 0 for '+it.itemName,'error');return}
     if(it.issueQty>it.availableStock){toast('Insufficient stock for '+it.itemName,'error');return}
   }
-  // FIX: reserve on save
   let voucherNo=document.getElementById('issueVoucherNo').textContent;
   if(document.getElementById('issueVoucherNo').dataset.reserved!=='true'){
     voucherNo=await genId('MIR-');
@@ -1468,7 +1511,6 @@ async function saveReturn(){
   const itemInVoucher=(voucher.items||[]).find(i=>i.itemId===itemId);
   if(!itemInVoucher){toast('Item not found in this voucher','error');return}
   if(returnQty>itemInVoucher.issueQty){toast('Return qty cannot exceed issued qty ('+itemInVoucher.issueQty+')','error');return}
-  // FIX: reserve on save
   let returnId=document.getElementById('returnVoucherNo').textContent;
   if(document.getElementById('returnVoucherNo').dataset.reserved!=='true'){
     returnId=await genId('RET-');
@@ -1739,7 +1781,7 @@ function exportReportPDF(){
 // BACKUP
 // ============================================================
 async function exportBackup(){
-  const data={items:getItems(),vouchers:getVouchers(),receipts:getReceipts(),returns:getReturns(),history:getHistory(),buildings:getBuildings(),settings:getSettings(),exportedAt:new Date().toISOString(),version:'4.1'};
+  const data={items:getItems(),vouchers:getVouchers(),receipts:getReceipts(),returns:getReturns(),history:getHistory(),buildings:getBuildings(),settings:getSettings(),exportedAt:new Date().toISOString(),version:'4.2'};
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
@@ -1835,7 +1877,10 @@ async function refreshAll(){
   toast('Refreshed');
 }
 
-async function init(){
+// ============================================================
+// APP INIT (after login)
+// ============================================================
+async function initApp(){
   showLoading(true);
   try{await loadAllData()}catch(err){console.error(err);toast('Failed to load data. Check Supabase connection.','error')}
   showLoading(false);
@@ -1852,8 +1897,95 @@ async function init(){
   });
 }
 
-document.addEventListener('DOMContentLoaded',init);
-console.log('⚡ Electrical ERP v4.1 (Supabase Cloud) - Fixed Voucher Numbers');
+// ============================================================
+// AUTHENTICATION
+// ============================================================
+let currentUser = null;
+
+async function checkAuth(){
+  try{
+    const { data: { session } } = await sb.auth.getSession();
+    if (session && session.user) {
+      currentUser = session.user;
+      showApp(session.user);
+    } else {
+      showLogin();
+    }
+  } catch(err){
+    console.error('Auth check failed:', err);
+    showLogin();
+  }
+}
+
+async function handleLogin(e){
+  e.preventDefault();
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  const btn = document.getElementById('loginBtn');
+  const errDiv = document.getElementById('loginError');
+  errDiv.textContent = '';
+  btn.disabled = true;
+  btn.textContent = '⏳ Signing in...';
+
+  const { data, error } = await sb.auth.signInWithPassword({ email, password });
+
+  btn.disabled = false;
+  btn.textContent = '🔐 Sign In';
+
+  if (error) {
+    errDiv.textContent = '❌ ' + (error.message || 'Login failed');
+    return;
+  }
+  currentUser = data.user;
+  showApp(data.user);
+}
+
+function showApp(user){
+  document.getElementById('loginScreen').style.display = 'none';
+  const userMenu = document.getElementById('userMenu');
+  if (userMenu) {
+    userMenu.style.display = 'flex';
+    document.getElementById('userEmail').textContent = user.email;
+  }
+  initApp();
+}
+
+function showLogin(){
+  document.getElementById('loginScreen').style.display = 'flex';
+  const userMenu = document.getElementById('userMenu');
+  if (userMenu) userMenu.style.display = 'none';
+  const emailEl = document.getElementById('loginEmail');
+  const passEl = document.getElementById('loginPassword');
+  const errEl = document.getElementById('loginError');
+  if (emailEl) emailEl.value = '';
+  if (passEl) passEl.value = '';
+  if (errEl) errEl.textContent = '';
+}
+
+async function handleLogout(){
+  if (!confirm('Are you sure you want to logout?')) return;
+  await sb.auth.signOut();
+  currentUser = null;
+  showLogin();
+}
+
+// Session change listener
+sb.auth.onAuthStateChange((event, session) => {
+  if (event === 'SIGNED_OUT' || !session) {
+    currentUser = null;
+    showLogin();
+  }
+});
+
+// ============================================================
+// BOOT
+// ============================================================
+document.addEventListener('DOMContentLoaded', async () => {
+  document.getElementById('loadingOverlay').classList.remove('show');
+  await checkAuth();
+});
+
+console.log('⚡ Electrical ERP v4.2 (Auth + Voucher Fix + Supabase)');
 </script>
 </body>
 </html>
